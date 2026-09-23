@@ -735,9 +735,15 @@ def update_sprint(
         raise HTTPException(status_code=404, detail="Sprint not found")
     check_project_access(db, admin, sprint.project_id)
 
-    for field, value in update.model_dump(exclude_unset=True).items():
+    changes = update.model_dump(exclude_unset=True)
+    new_start = changes.get("start_date", sprint.start_date)
+    new_end = changes.get("end_date", sprint.end_date)
+    if new_end < new_start:
+        raise HTTPException(status_code=422, detail="end_date must be on or after start_date")
+
+    for field, value in changes.items():
         setattr(sprint, field, value)
-    
+
     db.commit()
     db.refresh(sprint)
     return get_sprint_stats(db, sprint)

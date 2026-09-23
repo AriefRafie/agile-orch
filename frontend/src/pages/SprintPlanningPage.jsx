@@ -24,6 +24,7 @@ const SprintPlanningPage = () => {
   // Sprint creation form
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [sprintForm, setSprintForm] = useState({ name: '', start_date: '', end_date: '', velocity: 40 });
+  const [sprintError, setSprintError] = useState('');
   const [creatingSprint, setCreatingSprint] = useState(false);
 
   const loadSprints = useCallback(async () => {
@@ -72,6 +73,11 @@ const SprintPlanningPage = () => {
   const handleCreateSprint = async (e) => {
     e.preventDefault();
     if (!sprintForm.name.trim() || creatingSprint) return;
+    if (sprintForm.end_date < sprintForm.start_date) {
+      setSprintError('End date must be on or after the start date.');
+      return;
+    }
+    setSprintError('');
     setCreatingSprint(true);
     try {
       const newSprint = await createSprint({ ...sprintForm, project_id: projectId });
@@ -82,6 +88,10 @@ const SprintPlanningPage = () => {
       await loadTasks();
     } catch (err) {
       console.error('Failed to create sprint', err);
+      const detail = err.response?.data?.detail;
+      setSprintError(
+        typeof detail === 'string' ? detail : detail?.[0]?.msg || 'Failed to create sprint.'
+      );
     } finally {
       setCreatingSprint(false);
     }
@@ -246,6 +256,7 @@ const SprintPlanningPage = () => {
                   <input
                     type="date"
                     value={sprintForm.start_date}
+                    max={sprintForm.end_date || undefined}
                     onChange={(e) => setSprintForm({ ...sprintForm, start_date: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
                     required
@@ -256,12 +267,16 @@ const SprintPlanningPage = () => {
                   <input
                     type="date"
                     value={sprintForm.end_date}
+                    min={sprintForm.start_date || undefined}
                     onChange={(e) => setSprintForm({ ...sprintForm, end_date: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
                     required
                   />
                 </div>
               </div>
+              {sprintError && (
+                <p className="text-xs text-red-400">{sprintError}</p>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Velocity Capacity (Hours)</label>
                 <input

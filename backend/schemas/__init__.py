@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from typing import Optional, List
 from datetime import date, datetime
 
@@ -77,6 +77,12 @@ class SprintBase(BaseModel):
     start_date: date
     end_date: date
     velocity: int = 40
+
+    @model_validator(mode="after")
+    def end_after_start(self):
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        return self
 
 class SprintCreate(SprintBase):
     pass
