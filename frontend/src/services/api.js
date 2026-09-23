@@ -35,9 +35,10 @@ export const forceLogout = () => {
 const isAuthRequest = (config) => /\/auth\/(login|register)/.test(config?.url || '');
 
 API.interceptors.request.use((config) => {
-  if (isAuthRequest(config)) return config;
   const token = localStorage.getItem('token');
-  if (token && isTokenExpired(token)) {
+  // Login/register must never bounce the user to /login, but register still
+  // needs the admin's token because only admins may create users.
+  if (token && isTokenExpired(token) && !isAuthRequest(config)) {
     forceLogout();
     return Promise.reject(new axios.CanceledError('Session expired'));
   }
