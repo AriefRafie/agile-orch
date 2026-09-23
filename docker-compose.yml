@@ -87,6 +87,7 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
+      - OLLAMA_THINK=${OLLAMA_THINK:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3009}
       - SECRET_KEY=${SECRET_KEY}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
@@ -119,6 +120,7 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
+      - OLLAMA_THINK=${OLLAMA_THINK:-}
       - SECRET_KEY=${SECRET_KEY}
     volumes:
       - ./backend:/app
