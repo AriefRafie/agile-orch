@@ -27,6 +27,8 @@
     {"title": "Refactor stuff", "description": ""},
     {"title": "Fix it", "description": ""},
     {"title": "Improvements", "description": ""},
-    {"title": "Update things", "description": ""}
+    {"title": "Update things", "description": ""},
+    {"title": "Improve performance of the app", "description": "It feels slow sometimes."},
+    {"title": "Make it better for users", "description": "Users want improvements."}
   ]
 }
