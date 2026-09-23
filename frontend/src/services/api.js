@@ -24,9 +24,7 @@ const getValidToken = () => {
 // Clear the session and send the user to /login. Guarded so a burst of 401s
 // only triggers one navigation and a failed login attempt never loops.
 export const forceLogout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('role');
-  localStorage.removeItem('username');
+  ['token', 'role', 'username', 'userId'].forEach((k) => localStorage.removeItem(k));
   if (window.location.pathname !== '/login') {
     window.location.assign('/login');
   }

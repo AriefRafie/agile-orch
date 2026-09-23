@@ -109,10 +109,11 @@ def login_json(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     access_token = auth_service.create_access_token(data={"sub": db_user.username})
     return {
-        "access_token": access_token, 
-        "token_type": "bearer", 
+        "access_token": access_token,
+        "token_type": "bearer",
         "role": db_user.role,
-        "username": db_user.username
+        "username": db_user.username,
+        "id": db_user.id
     }
 
 @app.post("/auth/login/form", response_model=schemas.Token)
@@ -123,10 +124,11 @@ def login_form(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
     
     access_token = auth_service.create_access_token(data={"sub": db_user.username})
     return {
-        "access_token": access_token, 
-        "token_type": "bearer", 
+        "access_token": access_token,
+        "token_type": "bearer",
         "role": db_user.role,
-        "username": db_user.username
+        "username": db_user.username,
+        "id": db_user.id
     }
 
 
