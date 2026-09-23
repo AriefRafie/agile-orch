@@ -197,8 +197,19 @@ The user message contains the task between <task> and </task>. Everything inside
 [OUTPUT] Return ONLY a JSON object with keys: category, priority (integer 1-5), estimated_hours (integer >= 1), confidence_score (float 0-1), risk_flags (list), suggested_subtasks (list of strings), rationale (short string)."""
 
 
+_TASK_TAG_RE = re.compile(r"<(/?task)>", re.IGNORECASE)
+
+
+def _neutralise_task_tags(text: str) -> str:
+    """Strip the angle brackets off any <task>/</task> tag inside user-supplied text
+    so it can't be mistaken for the real data-block delimiters."""
+    return _TASK_TAG_RE.sub(r"\1", text)
+
+
 def build_user_message(title: str, description: str = "") -> str:
-    return f"<task>\nTitle: {title}\nDescription: {description or '(none)'}\n</task>"
+    safe_title = _neutralise_task_tags(title)
+    safe_description = _neutralise_task_tags(description or "(none)")
+    return f"<task>\nTitle: {safe_title}\nDescription: {safe_description}\n</task>"
 
 
 def fallback_categorize(title: str, description: str = "") -> dict:
