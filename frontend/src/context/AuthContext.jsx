@@ -1,10 +1,24 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { isTokenExpired } from '../services/api';
 
 const AuthContext = createContext(null);
 
+// Ignore a token that has already expired so the app goes straight to /login
+// instead of rendering the workspace and then bouncing on the first 401.
+const loadStoredToken = () => {
+  const token = localStorage.getItem('token');
+  if (token && isTokenExpired(token)) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('username');
+    return null;
+  }
+  return token;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(loadStoredToken);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

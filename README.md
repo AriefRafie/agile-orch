@@ -48,7 +48,8 @@ DATABASE_URL=postgresql://admin:your_secure_password_here@db:5432/autosprint
 SECRET_KEY=your_long_random_secret_here
 ADMIN_PASSWORD=your_secure_admin_password_here
 CORS_ORIGIN=http://localhost:3009
-OLLAMA_MODEL=llama3.2:latest
+OLLAMA_URL=http://host.docker.internal:11434/api/generate
+OLLAMA_MODEL=llama3.1:8b
 AI_PROVIDER=ollama
 OPENAI_API_KEY=
 GROQ_API_KEY=
@@ -67,10 +68,19 @@ docker-compose up --build
 ```
 
 ### 3. Initialize the AI Model
-Once the containers are running, you need to "pull" the model into the Ollama container:
+By default the backend talks to an Ollama running on your machine (native Ollama uses the GPU; the Docker image is CPU-only on macOS). Install Ollama, then pull the model:
 
 ```
-docker exec -it as-ollama ollama pull llama3.2
+ollama pull llama3.1:8b
+```
+
+`llama3.1:8b` is the recommended model: on the app's task-analysis prompt it classified 14/14 categories and 13-14/14 priorities correctly. `llama3.2` (3B) is a lighter fallback but mislabels some security tasks.
+
+To run Ollama inside Docker instead, set `OLLAMA_URL=http://ollama:11434/api/generate` in `.env` and start with:
+
+```
+docker compose --profile docker-ollama up --build
+docker exec -it as-ollama ollama pull llama3.1:8b
 ```
 
 ### 4. Access the Application
@@ -84,6 +94,6 @@ AutoSprint supports three AI providers. Set `AI_PROVIDER` in your `.env`:
 
 | Provider | `AI_PROVIDER` | Required Keys | Notes |
 |----------|--------------|---------------|-------|
-| Ollama (default) | `ollama` | None | Runs locally in Docker |
+| Ollama (default) | `ollama` | None | Runs on the host by default; Docker via `--profile docker-ollama` |
 | OpenAI | `openai` | `OPENAI_API_KEY` | Uses gpt-4o-mini by default |
 | Groq | `groq` | `GROQ_API_KEY` | Uses llama-3.1-8b-instant by default |

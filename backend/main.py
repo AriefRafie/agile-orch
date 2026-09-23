@@ -23,6 +23,9 @@ from notification_service import (
 from report_service import generate_sprint_pdf
 from jose import JWTError, jwt
 from celery_app import analyze_task_background
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="AutoSprint API",
@@ -315,8 +318,49 @@ def get_project_users(
     return [{"id": u.id, "username": u.username, "role": u.role} for u in users]
 
 
-    # Offload AI analysis to Celery worker asynchronously
-    analyze_task_background.delay(db_task.id)
+@app.post("/tasks/", response_model=schemas.Task)
+async def create_task(
+    task: schemas.TaskCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_developer_or_admin)
+):
+    check_project_access(db, current_user, task.project_id)
+
+    if task.sprint_id is not None:
+        sprint = db.query(models.Sprint).filter(
+            models.Sprint.id == task.sprint_id,
+            models.Sprint.project_id == task.project_id
+        ).first()
+        if not sprint:
+            raise HTTPException(status_code=404, detail="Sprint not found in this project")
+
+    if task.assigned_to_id is not None:
+        if not db.query(models.User).filter(models.User.id == task.assigned_to_id).first():
+            raise HTTPException(status_code=404, detail="Assigned user not found")
+
+    task_data = task.model_dump()
+    if not task_data.get("estimated_hours"):
+        task_data["estimated_hours"] = 4
+    # Placeholders until the background AI analysis overwrites them
+    task_data["category"] = "General"
+    task_data["priority"] = 3
+
+    db_task = models.Task(**task_data)
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+
+    log_activity(db, db_task.id, current_user.id, "created", f"Created task '{db_task.title}'")
+
+    if db_task.assigned_to_id:
+        notify_task_assigned(db, db_task, db_task.assigned_to_id, current_user.username)
+
+    # Offload AI analysis to Celery worker asynchronously. The task is already
+    # saved, so a broker outage must not turn into a 500 for the client.
+    try:
+        analyze_task_background.delay(db_task.id)
+    except Exception as exc:
+        logger.warning("Could not enqueue AI analysis for task %d: %s", db_task.id, exc)
 
     return db_task
 
@@ -333,7 +377,13 @@ async def batch_analyze_tasks(
 
     for task in tasks:
         check_project_access(db, current_user, task.project_id)
-        analyze_task_background.delay(task.id)
+
+    try:
+        for task in tasks:
+            analyze_task_background.delay(task.id)
+    except Exception as exc:
+        logger.error("Could not enqueue batch AI analysis: %s", exc)
+        raise HTTPException(status_code=503, detail="Task queue unavailable, try again later")
 
     return {
         "status": "accepted",

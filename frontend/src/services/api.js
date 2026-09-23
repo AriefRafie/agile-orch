@@ -5,8 +5,42 @@ const API = axios.create({
   adapter: 'xhr'
 });
 
-API.interceptors.request.use((config) => {
+// Reads the JWT's exp claim (no verification, that's the server's job) so the
+// client can stop using a dead token before the server has to reject it.
+export const isTokenExpired = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+};
+
+const getValidToken = () => {
   const token = localStorage.getItem('token');
+  return token && !isTokenExpired(token) ? token : null;
+};
+
+// Clear the session and send the user to /login. Guarded so a burst of 401s
+// only triggers one navigation and a failed login attempt never loops.
+export const forceLogout = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('role');
+  localStorage.removeItem('username');
+  if (window.location.pathname !== '/login') {
+    window.location.assign('/login');
+  }
+};
+
+const isAuthRequest = (config) => /\/auth\/(login|register)/.test(config?.url || '');
+
+API.interceptors.request.use((config) => {
+  if (isAuthRequest(config)) return config;
+  const token = localStorage.getItem('token');
+  if (token && isTokenExpired(token)) {
+    forceLogout();
+    return Promise.reject(new axios.CanceledError('Session expired'));
+  }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -16,9 +50,8 @@ API.interceptors.request.use((config) => {
 API.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.reload();
+    if (error.response?.status === 401 && !isAuthRequest(error.config)) {
+      forceLogout();
     }
     return Promise.reject(error);
   }
@@ -96,27 +129,49 @@ export const exportSprintPDF = async (sprintId) => {
 };
 
 // SSE Notification stream
+// Returns a handle whose close() also stops any pending reconnect, so the
+// caller can tear the stream down after it has reconnected.
 export const createNotificationStream = (onMessage) => {
-  const token = localStorage.getItem('token');
-  const url = `${import.meta.env.VITE_API_URL || 'http://localhost:8009'}/notifications/stream?token=${token}`;
-  const eventSource = new EventSource(url);
-  
-  eventSource.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      onMessage(data);
-    } catch (e) {
-      console.error('SSE parse error:', e);
+  let eventSource = null;
+  let reconnectTimer = null;
+  let closed = false;
+
+  const connect = () => {
+    if (closed) return;
+    const token = getValidToken();
+    if (!token) {
+      // EventSource can't tell a 401 from a network blip, so we check the
+      // token ourselves instead of retrying a dead session every 5 seconds.
+      forceLogout();
+      return;
     }
+    const url = `${import.meta.env.VITE_API_URL || 'http://localhost:8009'}/notifications/stream?token=${token}`;
+    eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage(data);
+      } catch (e) {
+        console.error('SSE parse error:', e);
+      }
+    };
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      if (!closed) reconnectTimer = setTimeout(connect, 5000);
+    };
   };
-  
-  eventSource.onerror = () => {
-    // Reconnect after a delay
-    eventSource.close();
-    setTimeout(() => createNotificationStream(onMessage), 5000);
+
+  connect();
+
+  return {
+    close: () => {
+      closed = true;
+      clearTimeout(reconnectTimer);
+      if (eventSource) eventSource.close();
+    },
   };
-  
-  return eventSource;
 };
 
 export default API;
