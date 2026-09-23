@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchUsers, fetchProjects, fetchProjectUsers, grantProjectAccess, revokeProjectAccess, registerUser, deleteUser } from '../services/api';
+import { fetchUsers, fetchProjects, fetchProjectUsers, grantProjectAccess, revokeProjectAccess, registerUser, deleteUser, fetchAIStatus } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 function AdminPage() {
@@ -17,6 +17,7 @@ function AdminPage() {
   const [role, setRole] = useState('stakeholder'); // Default to stakeholder!
   const [creatingUser, setCreatingUser] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [aiStatus, setAiStatus] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -30,6 +31,11 @@ function AdminPage() {
       setProjects(projectsData);
     } catch (err) {
       console.error('Error fetching admin data', err);
+    }
+    try {
+      setAiStatus(await fetchAIStatus());
+    } catch (err) {
+      console.error('Error fetching AI status', err);
     }
   };
 
@@ -112,6 +118,33 @@ function AdminPage() {
           </button>
         )}
       </div>
+
+      {aiStatus && (
+        <div data-testid="ai-status-card" className="mb-6 bg-slate-800/50 rounded-xl border border-slate-700 p-4 flex flex-wrap gap-x-8 gap-y-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">AI provider</div>
+            <div className="text-sm text-white font-medium">{aiStatus.provider}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">Model</div>
+            <div className="text-sm text-white font-medium">{aiStatus.model || '—'}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">Status</div>
+            <div className={`text-sm font-medium ${aiStatus.reachable ? 'text-emerald-400' : 'text-red-400'}`}>
+              {aiStatus.reachable ? 'Reachable' : 'Unreachable'}
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">Evaluation</div>
+            <div className="text-sm text-slate-300">
+              {aiStatus.evaluation
+                ? <><span className={aiStatus.evaluation.passed ? 'text-emerald-400' : 'text-red-400'}>{aiStatus.evaluation.passed ? 'Passed' : 'Failed'}</span> · {aiStatus.evaluation.summary}</>
+                : 'Not evaluated'}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex space-x-4 mb-6">
         <button
