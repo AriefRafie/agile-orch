@@ -16,4 +16,6 @@ RUN pip install alembic
 COPY . .
 
 # Start the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# --timeout-graceful-shutdown: long-lived SSE connections (/notifications/stream)
+# otherwise block --reload restarts indefinitely while a browser tab is open.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--timeout-graceful-shutdown", "3"]
