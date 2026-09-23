@@ -46,6 +46,13 @@ import main  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+# Guard against ever truncating the wrong database: if this doesn't hold, fail loudly at
+# collection time rather than silently wiping whatever database.engine points at.
+assert database.engine.url.database == TEST_DB, (
+    f"refusing to run tests: database.engine points at {database.engine.url.database!r}, "
+    f"expected the test database {TEST_DB!r}"
+)
+
 
 def _truncate_all():
     tables = [t.name for t in database.Base.metadata.sorted_tables]
