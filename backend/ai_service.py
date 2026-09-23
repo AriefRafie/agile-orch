@@ -347,8 +347,12 @@ async def get_ai_status() -> dict:
     evaluation = None
     path = eval_result_path(AI_PROVIDER, model)
     if os.path.exists(path):
-        with open(path) as f:
-            evaluation = json.load(f)
+        try:
+            with open(path) as f:
+                evaluation = json.load(f)
+        except (OSError, ValueError) as err:
+            logger.warning("Could not read eval result file %s: %s", path, err)
+            evaluation = None
     return {"provider": AI_PROVIDER, "model": model,
             "reachable": await _probe(AI_PROVIDER, model), "evaluation": evaluation}
 

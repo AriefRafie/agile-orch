@@ -42,3 +42,19 @@ def test_status_openai_without_key_unreachable(api, users, monkeypatch, tmp_path
 
 def test_status_is_admin_only(api, users):
     assert api.c.get("/ai/status", headers=api.login("dev")).status_code == 403
+
+
+@respx.mock
+def test_status_corrupt_result_file_is_ignored(api, users, monkeypatch, tmp_path):
+    monkeypatch.setattr(ai_service, "AI_PROVIDER", "ollama")
+    monkeypatch.setattr(ai_service, "OLLAMA_URL", "http://ollama.test/api/generate")
+    monkeypatch.setitem(ai_service.MODEL_BY_PROVIDER, "ollama", "qwen3:14b")
+    monkeypatch.setattr(ai_service, "EVAL_RESULTS_DIR", str(tmp_path))
+    respx.get("http://ollama.test/api/tags").mock(
+        return_value=httpx.Response(200, json={"models": [{"name": "qwen3:14b"}]}))
+    (tmp_path / "ollama__qwen3_14b.json").write_text("{not valid json")
+    r = api.c.get("/ai/status", headers=api.login("admin"))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["reachable"] is True
+    assert body["evaluation"] is None
