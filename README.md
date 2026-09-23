@@ -49,7 +49,7 @@ SECRET_KEY=your_long_random_secret_here
 ADMIN_PASSWORD=your_secure_admin_password_here
 CORS_ORIGIN=http://localhost:3009
 OLLAMA_URL=http://host.docker.internal:11434/api/generate
-OLLAMA_MODEL=llama3.1:8b
+OLLAMA_MODEL=qwen3:14b
 AI_PROVIDER=ollama
 OPENAI_API_KEY=
 GROQ_API_KEY=
@@ -71,16 +71,16 @@ docker-compose up --build
 By default the backend talks to an Ollama running on your machine (native Ollama uses the GPU; the Docker image is CPU-only on macOS). Install Ollama, then pull the model:
 
 ```
-ollama pull llama3.1:8b
+ollama pull qwen3:14b
 ```
 
-`llama3.1:8b` is the recommended model: on the app's task-analysis prompt it classified 14/14 categories and 13-14/14 priorities correctly. `llama3.2` (3B) is a lighter fallback but mislabels some security tasks.
+`qwen3:14b` is the recommended model (about 9 GB). On the evaluation suite it scored 14/14 categories, 14/14 priorities and flagged 6/6 vague tasks, with 1 of 6 prompt-injection attempts succeeding (flagged for review); `llama3.1:8b` is a faster, lighter alternative (2/6 injections, 4/6 vague). No model yet passes the injection bar — review AI suggestions marked **Needs review**. Compare models yourself with the evaluation suite (see Running tests).
 
 To run Ollama inside Docker instead, set `OLLAMA_URL=http://ollama:11434/api/generate` in `.env` and start with:
 
 ```
 docker compose --profile docker-ollama up --build
-docker exec -it as-ollama ollama pull llama3.1:8b
+docker exec -it as-ollama ollama pull qwen3:14b
 ```
 
 ### 4. Access the Application
