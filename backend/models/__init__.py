@@ -66,6 +66,11 @@ class Task(Base):
     risk_flags = Column(Text, nullable=True, default=None)
     ai_rationale = Column(Text, nullable=True, default=None)
     suggested_subtasks = Column(Text, nullable=True, default=None)
+    ai_provider = Column(String, nullable=True, default=None)
+    ai_model = Column(String, nullable=True, default=None)
+    ai_is_fallback = Column(Boolean, nullable=False, default=False, server_default="false")
+    ai_needs_review = Column(Boolean, nullable=False, default=False, server_default="false")
+    ai_analyzed_at = Column(DateTime, nullable=True, default=None)
 
     assigned_to_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     sprint_id = Column(Integer, ForeignKey("sprints.id"), nullable=True)

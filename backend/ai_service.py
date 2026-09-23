@@ -177,7 +177,11 @@ def fallback_categorize(title: str, description: str = "") -> dict:
         "confidence_score": 0.3,
         "risk_flags": json.dumps(risk_flags),
         "suggested_subtasks": json.dumps(["Break down task requirements", "Implement core logic", "Write tests"]),
-        "rationale": f"Fallback classification based on keyword matching. Category: {category}."
+        "rationale": f"Fallback classification based on keyword matching. Category: {category}.",
+        "ai_provider": "fallback",
+        "ai_model": None,
+        "ai_is_fallback": True,
+        "ai_needs_review": True,
     }
 
 
@@ -239,6 +243,8 @@ PROVIDERS = {
     "groq": call_groq,
 }
 
+MODEL_BY_PROVIDER = {"ollama": OLLAMA_MODEL, "openai": OPENAI_MODEL, "groq": GROQ_MODEL}
+
 
 def parse_ai_response(raw: str, fallback: dict) -> dict:
     """Parse and validate AI JSON response using strict Pydantic model validation."""
@@ -252,6 +258,8 @@ def parse_ai_response(raw: str, fallback: dict) -> dict:
             "risk_flags": json.dumps(validated_model.risk_flags),
             "suggested_subtasks": json.dumps(validated_model.suggested_subtasks),
             "rationale": validated_model.rationale,
+            "ai_is_fallback": False,
+            "ai_needs_review": False,
         }
     except Exception as err:
         logger.warning("Pydantic AI JSON Validation Error: %s | Raw response: %s", err, raw[:200])
@@ -280,6 +288,9 @@ async def analyze_task_ai(title: str, description: str = "") -> dict:
     try:
         raw_response = await provider_fn(SYSTEM_PROMPT, build_user_message(title, description))
         result = parse_ai_response(raw_response, fallback)
+        if not result["ai_is_fallback"]:
+            result["ai_provider"] = AI_PROVIDER
+            result["ai_model"] = MODEL_BY_PROVIDER.get(AI_PROVIDER)
         return result
     except Exception as e:
         logger.error("AI Service Error (%s): %s", AI_PROVIDER, e)

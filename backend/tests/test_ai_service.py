@@ -71,3 +71,40 @@ async def test_groq_payload_uses_system_message(monkeypatch):
     await ai_service.call_groq("SYS", "USER")
     sent = json.loads(route.calls[0].request.content)
     assert sent["messages"][0] == {"role": "system", "content": "SYS"}
+
+
+async def test_success_records_provider_and_model(monkeypatch):
+    async def fake(system, user):
+        return json.dumps({"category": "Security", "priority": 5, "estimated_hours": 6, "confidence_score": 0.9,
+                           "risk_flags": ["security"], "suggested_subtasks": ["a", "b"], "rationale": "r"})
+    monkeypatch.setattr(ai_service, "AI_PROVIDER", "ollama")
+    monkeypatch.setitem(ai_service.PROVIDERS, "ollama", fake)
+    monkeypatch.setitem(ai_service.MODEL_BY_PROVIDER, "ollama", "qwen3:14b")
+    r = await ai_service.analyze_task_ai("Fix SQL injection in login", "raw SQL")
+    assert r["ai_provider"] == "ollama" and r["ai_model"] == "qwen3:14b"
+    assert r["ai_is_fallback"] is False
+
+
+async def test_provider_error_marks_fallback(monkeypatch):
+    async def boom(system, user):
+        raise httpx.ConnectError("down")
+    monkeypatch.setattr(ai_service, "AI_PROVIDER", "ollama")
+    monkeypatch.setitem(ai_service.PROVIDERS, "ollama", boom)
+    r = await ai_service.analyze_task_ai("Fix login", "")
+    assert r["ai_provider"] == "fallback" and r["ai_model"] is None and r["ai_is_fallback"] is True
+
+
+async def test_invalid_json_marks_fallback(monkeypatch):
+    async def junk(system, user):
+        return "not json"
+    monkeypatch.setattr(ai_service, "AI_PROVIDER", "ollama")
+    monkeypatch.setitem(ai_service.PROVIDERS, "ollama", junk)
+    r = await ai_service.analyze_task_ai("Fix login", "")
+    assert r["ai_is_fallback"] is True
+
+
+async def test_missing_openai_key_marks_fallback(monkeypatch):
+    monkeypatch.setattr(ai_service, "AI_PROVIDER", "openai")
+    monkeypatch.setattr(ai_service, "OPENAI_API_KEY", "")
+    r = await ai_service.analyze_task_ai("Fix login", "")
+    assert r["ai_is_fallback"] is True
