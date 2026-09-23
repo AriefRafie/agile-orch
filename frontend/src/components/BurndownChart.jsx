@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area } from 'recharts';
 import { fetchBurndown } from '../services/api';
 
 const BurndownChart = ({ sprintId }) => {
@@ -65,7 +65,8 @@ const BurndownChart = ({ sprintId }) => {
       </div>
       
       <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
+        {/* ComposedChart: AreaChart silently drops the <Line> child, hiding the ideal line */}
+        <ComposedChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
           <defs>
             <linearGradient id="burndownGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
@@ -85,6 +86,7 @@ const BurndownChart = ({ sprintId }) => {
             axisLine={{ stroke: '#334155' }}
             tickLine={false}
             unit="h"
+            domain={[0, 'auto']}
           />
           <Tooltip
             contentStyle={{
@@ -114,7 +116,7 @@ const BurndownChart = ({ sprintId }) => {
             dot={{ fill: '#3b82f6', r: 2, strokeWidth: 0 }}
             activeDot={{ r: 4, fill: '#3b82f6', stroke: '#1e293b', strokeWidth: 2 }}
           />
-        </AreaChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
