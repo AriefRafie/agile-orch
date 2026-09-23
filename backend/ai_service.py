@@ -5,6 +5,7 @@ import httpx
 import json
 import os
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,58 @@ ANALYSIS_JSON_SCHEMA = {
     "required": ["category", "priority", "estimated_hours", "confidence_score",
                  "risk_flags", "suggested_subtasks", "rationale"],
 }
+
+KEYWORDS = {
+    "Security": ["security", "auth", "login", "password", "jwt", "token", "permission", "cors",
+                 "cryptography", "injection", "xss", "csrf", "encrypt"],
+    "Database": ["database", "schema", "sql", "postgres", "migration", "table", "query", "index", "db"],
+    "DevOps": ["docker", "deploy", "pipeline", "yaml", "compose", "kubernetes", "devops", "aws", "gcp", "ci"],
+    "Frontend": ["css", "html", "frontend", "ui", "ux", "component", "button", "page", "react",
+                 "styling", "tailwind", "color"],
+    "Documentation": ["readme", "document", "docs", "comments", "wiki", "guide", "markdown", "tutorial", "docstring"],
+    "Backend": ["api", "endpoint", "service", "backend", "worker", "celery"],
+}
+
+
+def keyword_scores(text: str) -> dict:
+    """Count whole-word keyword hits per category (case-insensitive)."""
+    lowered = text.lower()
+    return {cat: sum(1 for w in words if re.search(rf"\b{re.escape(w)}\b", lowered))
+            for cat, words in KEYWORDS.items()}
+
+
+def adjust_confidence(result: dict, title: str, description: str) -> tuple:
+    """Turn the model's self-reported confidence into a trustworthy one.
+
+    Returns (confidence, needs_review). Rules are fixed in the spec; tune only via the eval suite.
+    """
+    conf = float(result.get("confidence_score") or 0.0)
+    if result.get("ai_is_fallback"):
+        return round(min(conf, 0.3), 2), True
+
+    needs_review = False
+    if len(title.split()) <= 3 and not (description or "").strip():
+        conf = min(conf, 0.5)
+
+    scores = keyword_scores(f"{title} {description or ''}")
+    strong = [c for c, n in scores.items() if n >= 2]
+    if strong and result.get("category") not in strong:
+        conf *= 0.6
+        needs_review = True
+
+    try:
+        risks = json.loads(result.get("risk_flags") or "[]")
+    except (TypeError, ValueError):
+        risks = []
+    best = max(scores, key=scores.get) if any(scores.values()) else None
+    if result.get("priority") == 5 and not risks and best in ("Documentation", "Frontend"):
+        conf *= 0.6
+        needs_review = True
+
+    conf = round(conf, 2)
+    if conf < 0.6:
+        needs_review = True
+    return conf, needs_review
 
 class AIAnalysisResponse(BaseModel):
     category: str = Field(default="Backend")
@@ -291,6 +344,7 @@ async def analyze_task_ai(title: str, description: str = "") -> dict:
         if not result["ai_is_fallback"]:
             result["ai_provider"] = AI_PROVIDER
             result["ai_model"] = MODEL_BY_PROVIDER.get(AI_PROVIDER)
+        result["confidence_score"], result["ai_needs_review"] = adjust_confidence(result, title, description)
         return result
     except Exception as e:
         logger.error("AI Service Error (%s): %s", AI_PROVIDER, e)
