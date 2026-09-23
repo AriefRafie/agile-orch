@@ -298,6 +298,49 @@ PROVIDERS = {
 
 MODEL_BY_PROVIDER = {"ollama": OLLAMA_MODEL, "openai": OPENAI_MODEL, "groq": GROQ_MODEL}
 
+EVAL_RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_eval", "results")
+
+
+def eval_result_path(provider: str, model: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9.-]", "_", model or "none")
+    return os.path.join(EVAL_RESULTS_DIR, f"{provider}__{safe}.json")
+
+
+async def _probe(provider: str, model: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            if provider == "ollama":
+                base = OLLAMA_URL.rsplit("/api/", 1)[0]
+                r = await client.get(f"{base}/api/tags")
+                r.raise_for_status()
+                return any(m.get("name") == model for m in r.json().get("models", []))
+            if provider == "openai":
+                if not OPENAI_API_KEY:
+                    return False
+                r = await client.get("https://api.openai.com/v1/models",
+                                     headers={"Authorization": f"Bearer {OPENAI_API_KEY}"})
+                return r.status_code == 200
+            if provider == "groq":
+                if not GROQ_API_KEY:
+                    return False
+                r = await client.get("https://api.groq.com/openai/v1/models",
+                                     headers={"Authorization": f"Bearer {GROQ_API_KEY}"})
+                return r.status_code == 200
+    except (httpx.HTTPError, ValueError):
+        return False
+    return False
+
+
+async def get_ai_status() -> dict:
+    model = MODEL_BY_PROVIDER.get(AI_PROVIDER)
+    evaluation = None
+    path = eval_result_path(AI_PROVIDER, model)
+    if os.path.exists(path):
+        with open(path) as f:
+            evaluation = json.load(f)
+    return {"provider": AI_PROVIDER, "model": model,
+            "reachable": await _probe(AI_PROVIDER, model), "evaluation": evaluation}
+
 
 def parse_ai_response(raw: str, fallback: dict) -> dict:
     """Parse and validate AI JSON response using strict Pydantic model validation."""
