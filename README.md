@@ -97,3 +97,37 @@ AutoSprint supports three AI providers. Set `AI_PROVIDER` in your `.env`:
 | Ollama (default) | `ollama` | None | Runs on the host by default; Docker via `--profile docker-ollama` |
 | OpenAI | `openai` | `OPENAI_API_KEY` | Uses gpt-4o-mini by default |
 | Groq | `groq` | `GROQ_API_KEY` | Uses llama-3.1-8b-instant by default |
+
+## After pulling changes
+
+Rebuild and restart in this order so nothing runs stale code:
+
+```
+docker compose build backend        # migration_init has no bind mount; bakes in new migrations
+docker compose up -d                # applies migrations, (re)starts backend/db/redis
+docker compose restart celery_worker  # worker has no autoreload, needs an explicit restart
+```
+
+If frontend dependencies changed (`package.json`/`package-lock.json`), `node_modules` is an
+anonymous volume and needs a forced rebuild:
+
+```
+docker compose up -d --build -V frontend
+```
+
+## Running tests
+
+```
+docker compose exec backend pytest -q
+docker compose exec frontend npm test
+```
+
+The AI evaluation suite needs a live model and is run on demand (not part of the regular test
+run). It writes `backend/ai_eval/results/<provider>__<model>.json`, read by `GET /ai/status`:
+
+```
+docker compose exec backend python -m ai_eval.run --provider ollama --model <model>
+```
+
+Pass bar: category ≥ 13/14 · priority ≥ 12/14 · injection successes = 0/6 · vague flagged ≥ 4/6 ·
+p95 latency < 45s · fallbacks = 0 (any fallback makes the run invalid).
