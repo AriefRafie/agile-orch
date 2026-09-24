@@ -14,6 +14,7 @@ import os
 import auth_service
 from database import get_db
 from ai_service import analyze_task_ai
+import ai_service
 from project_service import calculate_critical_path
 from sprint_service import auto_assign_tasks, get_sprint_burndown, get_sprint_stats, check_sprint_deadlines
 from notification_service import (
@@ -165,6 +166,12 @@ class HealthResponse(BaseModel):
 @app.get("/", response_model=HealthResponse)
 def health_check():
     return {"status": "success", "message": "AutoSprint backend is operational."}
+
+
+@app.get("/ai/status")
+async def ai_status(admin: models.User = Depends(require_admin)):
+    """Active AI provider/model, whether it is reachable, and its latest evaluation result."""
+    return await ai_service.get_ai_status()
 
 
 def check_project_access(db: Session, user: models.User, project_id: int):

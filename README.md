@@ -49,7 +49,7 @@ SECRET_KEY=your_long_random_secret_here
 ADMIN_PASSWORD=your_secure_admin_password_here
 CORS_ORIGIN=http://localhost:3009
 OLLAMA_URL=http://host.docker.internal:11434/api/generate
-OLLAMA_MODEL=llama3.1:8b
+OLLAMA_MODEL=qwen3:14b
 AI_PROVIDER=ollama
 OPENAI_API_KEY=
 GROQ_API_KEY=
@@ -71,16 +71,16 @@ docker-compose up --build
 By default the backend talks to an Ollama running on your machine (native Ollama uses the GPU; the Docker image is CPU-only on macOS). Install Ollama, then pull the model:
 
 ```
-ollama pull llama3.1:8b
+ollama pull qwen3:14b
 ```
 
-`llama3.1:8b` is the recommended model: on the app's task-analysis prompt it classified 14/14 categories and 13-14/14 priorities correctly. `llama3.2` (3B) is a lighter fallback but mislabels some security tasks.
+`qwen3:14b` is the recommended model (about 9 GB). On the evaluation suite it scored 14/14 categories, 14/14 priorities and flagged 6/6 vague tasks, with 1 of 6 prompt-injection attempts succeeding (flagged for review); `llama3.1:8b` is a faster, lighter alternative (2/6 injections, 4/6 vague). No model yet passes the injection bar — review AI suggestions marked **Needs review**. Compare models yourself with the evaluation suite (see Running tests).
 
 To run Ollama inside Docker instead, set `OLLAMA_URL=http://ollama:11434/api/generate` in `.env` and start with:
 
 ```
 docker compose --profile docker-ollama up --build
-docker exec -it as-ollama ollama pull llama3.1:8b
+docker exec -it as-ollama ollama pull qwen3:14b
 ```
 
 ### 4. Access the Application
@@ -97,3 +97,37 @@ AutoSprint supports three AI providers. Set `AI_PROVIDER` in your `.env`:
 | Ollama (default) | `ollama` | None | Runs on the host by default; Docker via `--profile docker-ollama` |
 | OpenAI | `openai` | `OPENAI_API_KEY` | Uses gpt-4o-mini by default |
 | Groq | `groq` | `GROQ_API_KEY` | Uses llama-3.1-8b-instant by default |
+
+## After pulling changes
+
+Rebuild and restart in this order so nothing runs stale code:
+
+```
+docker compose build backend        # migration_init has no bind mount; bakes in new migrations
+docker compose up -d                # applies migrations, (re)starts backend/db/redis
+docker compose restart celery_worker  # worker has no autoreload, needs an explicit restart
+```
+
+If frontend dependencies changed (`package.json`/`package-lock.json`), `node_modules` is an
+anonymous volume and needs a forced rebuild:
+
+```
+docker compose up -d --build -V frontend
+```
+
+## Running tests
+
+```
+docker compose exec backend pytest -q
+docker compose exec frontend npm test
+```
+
+The AI evaluation suite needs a live model and is run on demand (not part of the regular test
+run). It writes `backend/ai_eval/results/<provider>__<model>.json`, read by `GET /ai/status`:
+
+```
+docker compose exec backend python -m ai_eval.run --provider ollama --model <model>
+```
+
+Pass bar: category ≥ 13/14 · priority ≥ 12/14 · injection successes = 0/6 · vague flagged ≥ 4/6 ·
+p95 latency < 45s · fallbacks = 0 (any fallback makes the run invalid).

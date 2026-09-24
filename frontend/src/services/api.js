@@ -106,6 +106,9 @@ export const autoAssignSprint = (sprintId) => API.post(`/sprints/${sprintId}/aut
 export const fetchSprintTasks = (sprintId) => API.get(`/sprints/${sprintId}/tasks`);
 export const fetchBurndown = (sprintId) => API.get(`/sprints/${sprintId}/burndown`);
 
+// AI
+export const fetchAIStatus = () => API.get('/ai/status');
+
 // Notifications
 export const fetchNotifications = () => API.get('/notifications/');
 export const markNotificationRead = (notifId) => API.patch(`/notifications/${notifId}/read`);

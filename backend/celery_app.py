@@ -2,6 +2,7 @@ from celery import Celery
 import os
 import asyncio
 import logging
+from datetime import datetime
 from database import SessionLocal
 import models
 from ai_service import analyze_task_ai
@@ -48,6 +49,11 @@ def analyze_task_background(self, task_id: int):
         task.risk_flags = ai_suggestions.get("risk_flags")
         task.ai_rationale = ai_suggestions.get("rationale", "")
         task.suggested_subtasks = ai_suggestions.get("suggested_subtasks")
+        task.ai_provider = ai_suggestions.get("ai_provider")
+        task.ai_model = ai_suggestions.get("ai_model")
+        task.ai_is_fallback = bool(ai_suggestions.get("ai_is_fallback", False))
+        task.ai_needs_review = bool(ai_suggestions.get("ai_needs_review", False))
+        task.ai_analyzed_at = datetime.utcnow()
 
         db.commit()
         logger.info("Successfully updated Task ID %d with AI analysis.", task_id)

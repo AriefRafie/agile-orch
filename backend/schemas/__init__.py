@@ -51,6 +51,11 @@ class Task(TaskBase):
     risk_flags: Optional[str] = None
     ai_rationale: Optional[str] = None
     suggested_subtasks: Optional[str] = None
+    ai_provider: Optional[str] = None
+    ai_model: Optional[str] = None
+    ai_is_fallback: bool = False
+    ai_needs_review: bool = False
+    ai_analyzed_at: Optional[datetime] = None
     assigned_to_id: Optional[int] = None
     sprint_id: Optional[int] = None
     assignees: List['User'] = []

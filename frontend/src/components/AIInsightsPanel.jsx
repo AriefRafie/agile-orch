@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { fetchTaskActivity, createTask } from '../services/api';
+import { timeAgo } from '../utils/timeAgo';
 
 const RISK_LABELS = {
   security: { emoji: '🔴', label: 'Security Risk', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
@@ -59,6 +60,25 @@ const AIInsightsPanel = ({ task, projectId, onSubtaskCreated }) => {
 
   return (
     <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-3">
+      {(task.ai_provider || task.ai_needs_review) && (
+        <div data-testid="ai-provenance" className="flex flex-wrap items-center gap-1.5 text-[10px]">
+          {task.ai_is_fallback ? (
+            <span className="px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20">
+              Keyword fallback — AI was unavailable
+            </span>
+          ) : task.ai_model ? (
+            <span className="text-slate-500">
+              {task.ai_model} via {task.ai_provider}
+              {task.ai_analyzed_at ? ` · analysed ${timeAgo(task.ai_analyzed_at)}` : ''}
+            </span>
+          ) : null}
+          {task.ai_needs_review && (
+            <span className="px-1.5 py-0.5 rounded border bg-red-500/10 text-red-400 border-red-500/20">
+              Needs review
+            </span>
+          )}
+        </div>
+      )}
       {/* Confidence + Rationale */}
       <div className="flex items-start gap-3">
         {confidence != null && (

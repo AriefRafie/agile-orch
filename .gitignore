@@ -9,3 +9,4 @@ dist/
 .DS_Store
 Thumbs.db
 .gstack/
+backend/ai_eval/results/
