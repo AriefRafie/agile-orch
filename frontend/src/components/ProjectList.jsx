@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchProjects, createProject, deleteProject } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { showConfirm } from '../utils/alerts';
 
 function ProjectList({ onSelectProject }) {
   const { user } = useAuth();
@@ -40,7 +41,13 @@ function ProjectList({ onSelectProject }) {
 
   const handleDeleteProject = async (e, projectId) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this project and all its tasks?")) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Project?',
+      text: 'Are you sure you want to delete this project and all its tasks?',
+      confirmText: 'Delete Project',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await deleteProject(projectId);
       loadProjects();

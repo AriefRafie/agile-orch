@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchProjects, createProject, deleteProject } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { showConfirm } from '../utils/alerts';
 
 const ProjectsPage = () => {
   const { user } = useAuth();
@@ -48,7 +49,13 @@ const ProjectsPage = () => {
 
   const handleDelete = async (e, projectId) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this project and all its tasks?")) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Project?',
+      text: 'Are you sure you want to delete this project and all its tasks?',
+      confirmText: 'Delete Project',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await deleteProject(projectId);
       await loadProjects();

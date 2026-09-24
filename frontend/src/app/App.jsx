@@ -8,6 +8,7 @@ import BacklogPage from '../pages/BacklogPage';
 import SprintPlanningPage from '../pages/SprintPlanningPage';
 import ActiveSprintPage from '../pages/ActiveSprintPage';
 import SprintHistoryPage from '../pages/SprintHistoryPage';
+import RetrospectivePage from '../pages/RetrospectivePage';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import AdminPage from '../pages/AdminPage';
 import Login from '../components/Login';
@@ -63,6 +64,7 @@ function App() {
             />
             <Route path="projects/:projectId/active" element={<ActiveSprintPage />} />
             <Route path="projects/:projectId/history" element={<SprintHistoryPage />} />
+            <Route path="projects/:projectId/retro" element={<RetrospectivePage />} />
             <Route path="projects/:projectId/analytics" element={<AnalyticsPage />} />
 
             {/* Admin Dashboard */}

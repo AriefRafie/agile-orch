@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Sprint, Task, User
+from models import Sprint, Task, User, Retrospective
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
 from io import BytesIO
@@ -43,6 +43,34 @@ def generate_sprint_pdf(db: Session, sprint_id: int) -> BytesIO:
             "assignee": assignee or "Unassigned"
         })
 
+    retro = db.query(Retrospective).filter(Retrospective.sprint_id == sprint_id).first()
+    retro_data = None
+    if retro:
+        grouped = {"went_well": [], "to_improve": [], "action_item": []}
+        for item in retro.items:
+            owner = None
+            if item.owner_id:
+                owner_user = db.query(User).filter(User.id == item.owner_id).first()
+                owner = owner_user.username if owner_user else None
+            grouped.setdefault(item.category, []).append({
+                "content": item.content,
+                "votes": item.votes,
+                "is_done": item.is_done,
+                "owner": owner,
+            })
+        retro_data = {
+            "title": retro.title,
+            "status": retro.status,
+            "summary": retro.summary,
+            "items": grouped,
+            "stats": {
+                "went_well": len(grouped["went_well"]),
+                "to_improve": len(grouped["to_improve"]),
+                "action_items": len(grouped["action_item"]),
+                "action_items_done": sum(1 for i in grouped["action_item"] if i["is_done"]),
+            }
+        }
+
     env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
     template = env.get_template("sprint_report.html")
 
@@ -57,7 +85,8 @@ def generate_sprint_pdf(db: Session, sprint_id: int) -> BytesIO:
         completion_pct=completion_pct,
         total_estimated=total_estimated,
         done_estimated=done_estimated,
-        tasks=task_rows
+        tasks=task_rows,
+        retro=retro_data
     )
 
     pdf_buffer = BytesIO()

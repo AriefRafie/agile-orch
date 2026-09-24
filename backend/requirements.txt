@@ -14,3 +14,5 @@ weasyprint
 sse-starlette
 celery
 redis
+python-dotenv
+alembic

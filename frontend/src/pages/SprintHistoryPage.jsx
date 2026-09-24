@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchSprints, fetchSprintTasks, exportSprintPDF } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { showError } from '../utils/alerts';
 
 function SprintHistoryPage() {
   const { projectId } = useParams();
@@ -49,16 +50,9 @@ function SprintHistoryPage() {
 
   const handleDownloadReport = async (sprintId, sprintName) => {
     try {
-      const response = await exportSprintPDF(sprintId);
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${sprintName.replace(/\s+/g, '_')}_Report.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      await exportSprintPDF(sprintId, `${sprintName.replace(/\s+/g, '_')}_Report.pdf`);
     } catch (err) {
-      alert('Failed to generate PDF report.');
+      showError('Failed to generate PDF report.', 'Export failed');
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { updateTaskStatus } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { showAlert, showError } from '../utils/alerts';
 
 const COLUMNS = [
   { id: 'Todo', label: 'Todo', color: 'slate', icon: '○' },
@@ -30,7 +31,7 @@ const KanbanCard = ({ task, index, onExpand }) => {
   const riskFlags = task.risk_flags ? JSON.parse(task.risk_flags) : [];
   
   return (
-    <Draggable draggableId={String(task.id)} index={index}>
+    <Draggable draggableId={String(task.id)} index={index} isDragDisabled={false}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
@@ -146,8 +147,8 @@ const KanbanBoard = ({ tasks, onAction, onExpandTask }) => {
     
     if (!task || task.status === newStatus) return;
 
-    if (task.status === 'Done' && (newStatus === 'Todo' || newStatus === 'In Progress' || newStatus === 'Review')) {
-      alert("Cannot move a completed task back to Todo, In Progress, or Review.");
+    if (task.status === 'Done' && (newStatus === 'Todo' || newStatus === 'Review')) {
+      showAlert('Cannot move a completed task to Todo or Review. Only In Progress is allowed for rework.', 'warning');
       return;
     }
 
@@ -156,7 +157,7 @@ const KanbanBoard = ({ tasks, onAction, onExpandTask }) => {
       if (onAction) await onAction();
     } catch (err) {
       const detail = err.response?.data?.detail;
-      if (detail) alert(detail);
+      if (detail) showError(detail, 'Cannot move task');
       else console.error('Status update failed:', err);
     }
   };

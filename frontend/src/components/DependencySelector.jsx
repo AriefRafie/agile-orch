@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createDependency } from '../services/api';
+import { showError } from '../utils/alerts';
 
 const DependencySelector = ({ tasks, onDependencyAdded, currentTaskId }) => {
   const [targetId, setTargetId] = useState(currentTaskId || '');
@@ -24,7 +25,7 @@ const DependencySelector = ({ tasks, onDependencyAdded, currentTaskId }) => {
       }
       if (onDependencyAdded) onDependencyAdded();
     } catch (err) {
-      alert("Error: Cycle detected or invalid dependency.");
+      showError(err.response?.data?.detail || 'Cycle detected or invalid dependency.', 'Cannot link dependency');
     } finally {
       setLoading(false);
     }

@@ -162,3 +162,72 @@ class BurndownPoint(BaseModel):
     date: str
     ideal: float
     actual: float
+
+
+class RetrospectiveCreate(BaseModel):
+    title: Optional[str] = None
+
+
+class RetrospectiveUpdate(BaseModel):
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    status: Optional[str] = None
+
+
+class RetroItemCreate(BaseModel):
+    category: str
+    content: str
+    owner_id: Optional[int] = None
+    priority: int = 1
+
+
+class RetroItemUpdate(BaseModel):
+    content: Optional[str] = None
+    category: Optional[str] = None
+    owner_id: Optional[int] = None
+    priority: Optional[int] = None
+    is_done: Optional[bool] = None
+
+
+class RetroItemBase(BaseModel):
+    id: int
+    retrospective_id: int
+    category: str
+    content: str
+    priority: int = 1
+    is_done: bool = False
+    votes: int = 0
+    created_by_id: int
+    created_at: datetime
+
+
+class RetroItem(RetroItemBase):
+    owner_id: Optional[int] = None
+    owner: Optional['User'] = None
+    created_by: Optional['User'] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RetrospectiveBase(BaseModel):
+    id: int
+    sprint_id: int
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    status: str = "open"
+    created_by_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class Retrospective(RetrospectiveBase):
+    items: List[RetroItem] = []
+
+    class Config:
+        from_attributes = True
+
+
+class RetrospectiveDetail(Retrospective):
+    items_grouped: dict = {}
+    stats: dict = {}
