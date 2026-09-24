@@ -106,6 +106,16 @@ export const autoAssignSprint = (sprintId) => API.post(`/sprints/${sprintId}/aut
 export const fetchSprintTasks = (sprintId) => API.get(`/sprints/${sprintId}/tasks`);
 export const fetchBurndown = (sprintId) => API.get(`/sprints/${sprintId}/burndown`);
 
+// Retrospectives
+export const fetchSprintRetrospective = (sprintId) => API.get(`/sprints/${sprintId}/retrospective`);
+export const createSprintRetrospective = (sprintId, data = {}) => API.post(`/sprints/${sprintId}/retrospective`, data);
+export const updateRetrospective = (retroId, data) => API.patch(`/retrospectives/${retroId}`, data);
+export const deleteRetrospective = (retroId) => API.delete(`/retrospectives/${retroId}`);
+export const addRetroItem = (retroId, itemData) => API.post(`/retrospectives/${retroId}/items`, itemData);
+export const updateRetroItem = (retroId, itemId, data) => API.patch(`/retrospectives/${retroId}/items/${itemId}`, data);
+export const deleteRetroItem = (retroId, itemId) => API.delete(`/retrospectives/${retroId}/items/${itemId}`);
+export const voteRetroItem = (retroId, itemId) => API.post(`/retrospectives/${retroId}/items/${itemId}/vote`);
+
 // AI
 export const fetchAIStatus = () => API.get('/ai/status');
 
@@ -115,7 +125,7 @@ export const markNotificationRead = (notifId) => API.patch(`/notifications/${not
 export const markAllNotificationsRead = () => API.patch('/notifications/read-all');
 
 // Reports
-export const exportSprintPDF = async (sprintId) => {
+export const exportSprintPDF = async (sprintId, filename) => {
   const token = localStorage.getItem('token');
   const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8009'}/reports/sprint/${sprintId}/export`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -125,7 +135,7 @@ export const exportSprintPDF = async (sprintId) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `sprint_${sprintId}_report.pdf`;
+  a.download = filename || `sprint_${sprintId}_report.pdf`;
   a.click();
   URL.revokeObjectURL(url);
 };

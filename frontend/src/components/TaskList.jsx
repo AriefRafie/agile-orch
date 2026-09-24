@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { deleteTask, completeTask } from '../services/api';
 import TaskCard from './TaskCard';
+import { showError } from '../utils/alerts';
 
 const TaskList = ({ tasks, criticalIds, totalHours, onAction, projectId }) => {
 
@@ -18,7 +19,7 @@ const TaskList = ({ tasks, criticalIds, totalHours, onAction, projectId }) => {
       if (onAction) await onAction();
     } catch (err) {
       const detail = err.response?.data?.detail;
-      if (detail) alert(detail);
+      if (detail) showError(detail, action === 'delete' ? 'Cannot delete task' : 'Cannot complete task');
       else console.error(`Action [${action}] failed:`, err);
     }
   };

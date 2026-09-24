@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchSprints, createSprint, deleteSprint, autoAssignSprint, exportSprintPDF, updateSprint } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { showConfirm, showAlert } from '../utils/alerts';
 
 const SprintManager = ({ projectId, activeSprint, onSelectSprint }) => {
   const { user } = useAuth();
@@ -40,7 +41,12 @@ const SprintManager = ({ projectId, activeSprint, onSelectSprint }) => {
 
   const handleDelete = async (e, sprintId) => {
     e.stopPropagation();
-    if (!window.confirm('Delete this sprint? Tasks will be unlinked but not deleted.')) return;
+    if (!(await showConfirm({
+      title: 'Delete Sprint?',
+      text: 'Delete this sprint? Tasks will be unlinked but not deleted.',
+      confirmText: 'Delete',
+      danger: true,
+    }))) return;
     try {
       await deleteSprint(sprintId);
       if (activeSprint?.id === sprintId) onSelectSprint(null);
@@ -54,7 +60,7 @@ const SprintManager = ({ projectId, activeSprint, onSelectSprint }) => {
     e.stopPropagation();
     try {
       const result = await autoAssignSprint(sprintId);
-      alert(result.message);
+      showAlert(result.message, 'success');
       loadSprints();
     } catch (err) {
       console.error('Auto-assign failed', err);

@@ -22,6 +22,7 @@ from notification_service import (
     get_unread_notifications, mark_notification_read, mark_all_read
 )
 from report_service import generate_sprint_pdf
+import retro_service
 from jose import JWTError, jwt
 from celery_app import analyze_task_background
 import logging
@@ -499,6 +500,12 @@ def update_task_status(
     if status_update.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
 
+    if db_task.status == "Done" and status_update.status in ("Todo", "Review"):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot move a completed task to Todo or Review. Only In Progress is allowed for rework."
+        )
+
     if status_update.status == "Done":
         unfinished = [t.title for t in db_task.dependencies if t.status != "Done"]
         if unfinished:
@@ -774,6 +781,11 @@ def delete_sprint(
             detail="Cannot delete an active sprint. Please pause or complete the sprint first."
         )
 
+    # Clean up any retrospective + items for this sprint (FK constraint)
+    retro = db.query(models.Retrospective).filter(models.Retrospective.sprint_id == sprint_id).first()
+    if retro:
+        retro_service.delete_retrospective(db, retro)
+
     db.query(models.Task).filter(models.Task.sprint_id == sprint_id).update(
         {"sprint_id": None}, synchronize_session=False
     )
@@ -816,6 +828,165 @@ def get_burndown(
         raise HTTPException(status_code=404, detail="Sprint not found")
     check_project_access(db, user, sprint.project_id)
     return get_sprint_burndown(db, sprint_id)
+
+
+def _get_retro_check_access(db: Session, user: models.User, retro_id: int) -> models.Retrospective:
+    retro = db.query(models.Retrospective).filter(models.Retrospective.id == retro_id).first()
+    if not retro:
+        raise HTTPException(status_code=404, detail="Retrospective not found")
+    sprint = db.query(models.Sprint).filter(models.Sprint.id == retro.sprint_id).first()
+    if not sprint:
+        raise HTTPException(status_code=404, detail="Sprint not found")
+    check_project_access(db, user, sprint.project_id)
+    return retro
+
+
+@app.post("/sprints/{sprint_id}/retrospective", response_model=schemas.RetrospectiveDetail)
+def create_retrospective(
+    sprint_id: int,
+    body: schemas.RetrospectiveCreate,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin)
+):
+    """Open the Sprint Retrospective ceremony for a sprint (Scrum master only)."""
+    sprint = db.query(models.Sprint).filter(models.Sprint.id == sprint_id).first()
+    if not sprint:
+        raise HTTPException(status_code=404, detail="Sprint not found")
+    check_project_access(db, admin, sprint.project_id)
+
+    try:
+        retro = retro_service.create_retrospective(db, sprint, admin.id, body.title)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    return retro_service.get_retrospective_detail(db, retro)
+
+
+@app.get("/sprints/{sprint_id}/retrospective", response_model=schemas.RetrospectiveDetail)
+def get_sprint_retrospective(
+    sprint_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
+):
+    """Get the retrospective for a sprint (404 if none opened yet)."""
+    sprint = db.query(models.Sprint).filter(models.Sprint.id == sprint_id).first()
+    if not sprint:
+        raise HTTPException(status_code=404, detail="Sprint not found")
+    check_project_access(db, user, sprint.project_id)
+
+    retro = retro_service.get_retrospective(db, sprint_id)
+    if not retro:
+        raise HTTPException(status_code=404, detail="No retrospective for this sprint yet")
+    return retro_service.get_retrospective_detail(db, retro)
+
+
+@app.patch("/retrospectives/{retro_id}", response_model=schemas.RetrospectiveDetail)
+def update_retrospective(
+    retro_id: int,
+    update: schemas.RetrospectiveUpdate,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin)
+):
+    """Update retro title/summary, or close it (status -> closed)."""
+    retro = _get_retro_check_access(db, admin, retro_id)
+    changes = update.model_dump(exclude_unset=True)
+    try:
+        retro = retro_service.update_retrospective(db, retro, changes)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return retro_service.get_retrospective_detail(db, retro)
+
+
+@app.delete("/retrospectives/{retro_id}")
+def delete_retrospective(
+    retro_id: int,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin)
+):
+    retro = _get_retro_check_access(db, admin, retro_id)
+    retro_service.delete_retrospective(db, retro)
+    return {"status": "success", "message": "Retrospective deleted."}
+
+
+@app.post("/retrospectives/{retro_id}/items", response_model=schemas.RetroItem)
+def add_retro_item(
+    retro_id: int,
+    item: schemas.RetroItemCreate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_developer_or_admin)
+):
+    """Add a retro reflection (Went Well / To Improve / Action Item)."""
+    retro = _get_retro_check_access(db, user, retro_id)
+    if retro.status == "closed":
+        raise HTTPException(status_code=400, detail="Retrospective is closed")
+    try:
+        return retro_service.add_retro_item(
+            db, retro, item.category, item.content,
+            created_by_id=user.id, owner_id=item.owner_id, priority=item.priority
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.patch("/retrospectives/{retro_id}/items/{item_id}", response_model=schemas.RetroItem)
+def update_retro_item(
+    retro_id: int,
+    item_id: int,
+    update: schemas.RetroItemUpdate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_developer_or_admin)
+):
+    retro = _get_retro_check_access(db, user, retro_id)
+    if retro.status == "closed":
+        raise HTTPException(status_code=400, detail="Retrospective is closed")
+    item = db.query(models.RetroItem).filter(
+        models.RetroItem.id == item_id,
+        models.RetroItem.retrospective_id == retro_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    try:
+        return retro_service.update_retro_item(db, item, update.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/retrospectives/{retro_id}/items/{item_id}")
+def delete_retro_item(
+    retro_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_developer_or_admin)
+):
+    retro = _get_retro_check_access(db, user, retro_id)
+    item = db.query(models.RetroItem).filter(
+        models.RetroItem.id == item_id,
+        models.RetroItem.retrospective_id == retro_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if not (user.role == models.UserRole.ADMIN or item.created_by_id == user.id):
+        raise HTTPException(status_code=403, detail="Only the author or a Scrum master can delete this item")
+    retro_service.delete_retro_item(db, item)
+    return {"status": "success", "message": "Item deleted."}
+
+
+@app.post("/retrospectives/{retro_id}/items/{item_id}/vote", response_model=schemas.RetroItem)
+def vote_retro_item(
+    retro_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_developer_or_admin)
+):
+    """Up-vote a retro item (used by teams to prioritise discussion)."""
+    retro = _get_retro_check_access(db, user, retro_id)
+    item = db.query(models.RetroItem).filter(
+        models.RetroItem.id == item_id,
+        models.RetroItem.retrospective_id == retro_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return retro_service.vote_retro_item(db, item)
 
 
 @app.get("/notifications/stream")

@@ -49,6 +49,7 @@ class Sprint(Base):
 
     project = relationship("Project", back_populates="sprints")
     tasks = relationship("Task", back_populates="sprint")
+    retrospectives = relationship("Retrospective", back_populates="sprint")
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -133,3 +134,48 @@ class Notification(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+class Retrospective(Base):
+    """Sprint Retrospective — the final Scrum ceremony of a sprint.
+
+    The team reflects on the sprint and captures feedback as items in three
+    categories: what went well, what needs improvement, and concrete action
+    items the team commits to. One retrospective per sprint."""
+    __tablename__ = "retrospectives"
+    id = Column(Integer, primary_key=True, index=True)
+    sprint_id = Column(Integer, ForeignKey("sprints.id"), nullable=False, unique=True)
+    title = Column(String, nullable=True)
+    summary = Column(Text, nullable=True)
+    status = Column(String, default="open")
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    sprint = relationship("Sprint")
+    created_by = relationship("User")
+    items = relationship(
+        "RetroItem",
+        back_populates="retrospective",
+        cascade="all, delete-orphan",
+        order_by="RetroItem.created_at.asc()"
+    )
+
+
+class RetroItem(Base):
+    """A single reflection entry in a Sprint Retrospective."""
+    __tablename__ = "retro_items"
+    id = Column(Integer, primary_key=True, index=True)
+    retrospective_id = Column(Integer, ForeignKey("retrospectives.id"), nullable=False)
+    category = Column(String, nullable=False)  # went_well | to_improve | action_item
+    content = Column(Text, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    priority = Column(Integer, default=1)
+    is_done = Column(Boolean, default=False)
+    votes = Column(Integer, default=0)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    retrospective = relationship("Retrospective", back_populates="items")
+    owner = relationship("User", foreign_keys=[owner_id])
+    created_by = relationship("User", foreign_keys=[created_by_id])

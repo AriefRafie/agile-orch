@@ -34,6 +34,7 @@ const DashboardLayout = () => {
     if (location.pathname.endsWith('/planning')) return { id: 'planning', label: 'Sprint Planning' };
     if (location.pathname.endsWith('/active')) return { id: 'active', label: 'Sprints' };
     if (location.pathname.endsWith('/history')) return { id: 'history', label: 'History' };
+    if (location.pathname.endsWith('/retro')) return { id: 'retro', label: 'Retrospective' };
     if (location.pathname.endsWith('/analytics')) return { id: 'analytics', label: 'Analytics' };
     return { id: 'backlog', label: 'Backlog' };
   };
@@ -51,6 +52,7 @@ const DashboardLayout = () => {
     isScrumMaster && { id: 'planning', label: 'Sprint Planning' },
     { id: 'active', label: 'Sprints' },
     { id: 'history', label: 'History' },
+    { id: 'retro', label: 'Retrospective' },
     { id: 'analytics', label: 'Analytics' }
   ].filter(Boolean);
 

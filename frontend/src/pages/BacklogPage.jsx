@@ -5,6 +5,7 @@ import TaskForm from '../components/TaskForm';
 import DependencySelector from '../components/DependencySelector';
 import AIInsightsPanel from '../components/AIInsightsPanel';
 import { useAuth } from '../context/AuthContext';
+import { showConfirm, showError } from '../utils/alerts';
 
 const BacklogPage = () => {
   const { projectId } = useParams();
@@ -52,7 +53,13 @@ const BacklogPage = () => {
   };
 
   const handleDeleteTask = async (taskId) => {
-    if (!window.confirm("Are you sure you want to delete this task? This action cannot be undone.")) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Task?',
+      text: 'Are you sure you want to delete this task? This action cannot be undone.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await deleteTask(taskId);
       if (selectedTask?.id === taskId) {
@@ -69,7 +76,7 @@ const BacklogPage = () => {
       await completeTask(taskId);
       await loadData();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to complete task');
+      showError(err.response?.data?.detail || 'Failed to complete task', 'Cannot complete task');
     }
   };
 

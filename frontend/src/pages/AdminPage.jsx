@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchUsers, fetchProjects, fetchProjectUsers, grantProjectAccess, revokeProjectAccess, registerUser, deleteUser, fetchAIStatus } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { showAlert, showConfirm, showError } from '../utils/alerts';
 
 function AdminPage() {
   const { user: currentUser } = useAuth();
@@ -61,7 +62,13 @@ function AdminPage() {
 
   const handleRevokeAccess = async (userId) => {
     if (!selectedProjectId) return;
-    if (!window.confirm("Revoke access for this user from the project?")) return;
+    const confirmed = await showConfirm({
+      title: 'Revoke Access?',
+      text: 'Revoke access for this user from the project?',
+      confirmText: 'Revoke',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await revokeProjectAccess(selectedProjectId, userId);
       loadProjectUsers(selectedProjectId);
@@ -72,17 +79,21 @@ function AdminPage() {
 
   const handleDeleteUser = async (userId, targetUsername) => {
     if (currentUser?.username === targetUsername) {
-      alert("Cannot delete yourself!");
+      showAlert('Cannot delete yourself!', 'warning');
       return;
     }
-    if (!window.confirm(`Are you sure you want to delete user "${targetUsername}"? This will revoke project access rules and remove task user assignments.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete User?',
+      text: `Are you sure you want to delete user "${targetUsername}"? This will revoke project access rules and remove task user assignments.`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await deleteUser(userId);
       await loadData();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to delete user.');
+      showError(err.response?.data?.detail || 'Failed to delete user.', 'Cannot delete user');
     }
   };
 

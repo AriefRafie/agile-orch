@@ -9,6 +9,7 @@ import {
   updateTaskSprint
 } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { showAlert, showConfirm, showError } from '../utils/alerts';
 
 const SprintPlanningPage = () => {
   const { projectId } = useParams();
@@ -100,13 +101,17 @@ const SprintPlanningPage = () => {
   const handleDeleteSprint = async () => {
     if (!activeSprint) return;
     if (activeSprint.status === 'active') {
-      alert("Cannot delete an active sprint. Please pause or complete the sprint first.");
+      showAlert('Cannot delete an active sprint. Please pause or complete the sprint first.', 'warning');
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete the sprint "${activeSprint.name}"? Tasks assigned to this sprint will be returned to the backlog.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Sprint?',
+      text: `Are you sure you want to delete the sprint "${activeSprint.name}"? Tasks assigned to this sprint will be returned to the backlog.`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
 
     try {
       await deleteSprint(activeSprint.id);
@@ -114,7 +119,7 @@ const SprintPlanningPage = () => {
       await loadSprints();
       await loadTasks();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to delete sprint');
+      showError(err.response?.data?.detail || 'Failed to delete sprint', 'Cannot delete sprint');
     }
   };
 
